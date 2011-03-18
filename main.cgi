@@ -41,10 +41,7 @@ class MessageDB(DB):
 				users = self.data["users"]
 				user = User(ip, name)
 				users.append(user)
-				difference = len(users) - maxusers
-				if difference > 0:
-					self.data["users"] = users[difference:]
-					#validationerror = "Too many users, deleted some"
+				enforceLength(users, maxusers)
 				self.dirty = True
 			return user
 	
@@ -60,7 +57,14 @@ class Message(object):
 		self.date = date
 		self.content = content
 	
+def enforceLength(list, length):
+	difference = len(list) - length
+	if difference > 0:
+		del list[:difference]
+		return True
+	return False
 
+	
 db = MessageDB(datafile)
 db.load()
 
@@ -82,10 +86,7 @@ if db.valid():
 		if len(content) > maxcontent:
 			validationerror = "Content too long (maxcontent=" + str(maxcontent) + "), trimmed excess"
 		messages.append(Message(me, datetime.utcnow(), content[:maxcontent]))
-		difference = len(messages) - maxmessages
-		if difference > 0:
-			db.data["messages"] = messages[difference:]
-			#validationerror = "Too many messages, deleted some"
+		enforceLength(messages, maxmessages)
 		db.dirty = True
 	
 
