@@ -1,0 +1,26 @@
+section {
+display: block;
+}
+
+section {
+overflow: auto;
+}
+
+.me > h4 {
+float: left;
+margin: 5px;
+}
+
+.me > code {
+float: left;
+margin: 8px 5px;
+}
+
+.me > form {
+float: left;
+margin: 3px 5px 0;
+}
+
+.post > form > textarea {
+display: block;
+}
