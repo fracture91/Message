@@ -12,8 +12,12 @@ from datetime import datetime
 #this module is broken on the CCC servers because they don't
 #have the important _sqlite3.so file
 #import sqlite3
-import cPickle
 import re
+
+#modules from the shared directory
+sys.path.append("/home/andrew.d.hurle/public_html/shared")
+from DB import DB
+del sys.path[0]
 
 datafile = "data.pkl"
 defaultusername = "Unknown User"
@@ -23,40 +27,6 @@ maxmessages = 5000
 maxcontent = 5000
 validationerror = None
 
-class DB(object):
-	def __init__(self, filename):
-		self.filename = filename
-		self.data = None
-		self.dirty = False
-	def load(self):
-		try:
-			file = open(self.filename, "r")
-			self.data = cPickle.load(file)
-			self.dirty = False
-			file.close()
-		except IOError:
-			self.data = "IOError opening message file"
-		except:
-			self.data = "Unknown error"
-	def save(self):
-		try:
-			file = open(self.filename, "w")
-			cPickle.dump(self.data, file)
-			self.dirty = False
-			file.close()
-		except IOError:
-			self.data = "IOError writing message file"
-		except:
-			self.data = "Unknown error"
-	def valid(self):
-		return isinstance(self.data, dict)
-	def close(self):
-		if self.dirty and self.valid():
-			self.save()
-			return True
-		return False
-		
-	
 class MessageDB(DB):
 	def __init__(self, filename):
 		super(MessageDB, self).__init__(filename)
@@ -64,10 +34,10 @@ class MessageDB(DB):
 		if (not name) == (not ip): #if both arguments are given or neither are given
 			raise TypeError("Must provide exactly one of name or ip")
 		else:
-			for user in self.data["users"]:
-				if name and user.name == name or ip and user.ip == ip:
-					return user
-			if make:
+			#find the first user with a matching name or ip
+			user = next((user for user in self.data["users"] if name and user.name == name or ip and user.ip == ip), None)
+			#make a new user if preferred
+			if user is None and make:
 				users = self.data["users"]
 				user = User(ip, name)
 				users.append(user)
@@ -76,8 +46,7 @@ class MessageDB(DB):
 					self.data["users"] = users[difference:]
 					#validationerror = "Too many users, deleted some"
 				self.dirty = True
-				return user
-			return None
+			return user
 	
 	
 class User(object):
