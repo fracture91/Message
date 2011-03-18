@@ -32,6 +32,8 @@ class DB(object):
 		try:
 			file = open(self.filename, "r")
 			self.data = cPickle.load(file)
+			self.dirty = False
+			file.close()
 		except IOError:
 			self.data = "IOError opening message file"
 		except:
@@ -40,12 +42,19 @@ class DB(object):
 		try:
 			file = open(self.filename, "w")
 			cPickle.dump(self.data, file)
+			self.dirty = False
+			file.close()
 		except IOError:
 			self.data = "IOError writing message file"
 		except:
 			self.data = "Unknown error"
 	def valid(self):
 		return isinstance(self.data, dict)
+	def close(self):
+		if self.dirty and self.valid():
+			self.save()
+			return True
+		return False
 		
 	
 class MessageDB(DB):
@@ -131,7 +140,7 @@ if validationerror:
 print '<section class="post">'
 print '<h3>Post message</h3>'
 print '<form method="post">'
-print '<textarea name="content"></textarea><input type="submit" value="post">'
+print '<textarea name="content"></textarea><input type="submit" value="Post">'
 print '</form>'
 print "</section>"
 print '<section class="messages">'
@@ -155,5 +164,4 @@ else:
 print "</section>"
 print "</body></html>"
 
-if db.dirty and db.valid():
-	db.save()
+db.close()
