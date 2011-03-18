@@ -64,7 +64,70 @@ def enforceLength(list, length):
 		return True
 	return False
 
+def handleForm(form):
+	if db.valid():
+		if "username" in form:
+			if re.match(validusername, form["username"].value):
+				me.name = form["username"].value
+				db.dirty = True
+			else:
+				validationerror = "Bad username (must match" + validusername + ")"
+		if "content" in form:
+			messages = db.data["messages"]
+			content = form["content"].value
+			if len(content) > maxcontent:
+				validationerror = "Content too long (maxcontent=" + str(maxcontent) + "), trimmed excess"
+			messages.append(Message(me, datetime.utcnow(), content[:maxcontent]))
+			enforceLength(messages, maxmessages)
+			db.dirty = True
 	
+def printHeaders():
+	print "Content-Type: text/html"
+	print
+	
+def printContent():
+	print "<html><head>"
+	print '<link rel="stylesheet" type="text/css" media="all" href="main.css">'
+	print "</head><body>"
+	print '<section class="me">'
+	print "<h4>" + (cgi.escape(me.name) if isinstance(me, User) and isinstance(me.name, str) else defaultusername) + "</h4>"
+	print "<code>" + cgi.escape(ipaddr, quote=True) + "</code>"
+	print '<form method="post"><input name="username"><input type="submit" value="Set username"></form>'
+	print "</section>"
+
+	if validationerror:
+		print "<div>" + validationerror + "</div>"
+		
+	print '<section class="post">'
+	print '<h3>Post message</h3>'
+	print '<form method="post">'
+	print '<textarea name="content"></textarea><input type="submit" value="Post">'
+	print '</form>'
+	print "</section>"
+	print '<section class="messages">'
+
+	if not db.valid():
+		print "Database invalid"
+	elif len(db.data["messages"]) < 1 :
+		print "No messages"
+	else:
+		for msg in reversed(db.data["messages"]):
+			print "<div>"
+			print cgi.escape(msg.user.name if isinstance(msg.user.name, str) else msg.user.ip, quote=True)
+			print " at "
+			print cgi.escape(msg.date.isoformat(), quote=True)
+			print "</div>"
+			print "<div>"
+			print cgi.escape(msg.content, quote=True)
+			print "</div>"
+			print "<br>"
+
+	print "</section>"
+	print "</body></html>"
+	
+
+
+
 db = MessageDB(datafile)
 db.load()
 
@@ -74,64 +137,10 @@ form = cgi.FieldStorage()
 me = None
 if db.valid():
 	me = db.findUser(ip=ipaddr, make=True)
-	if "username" in form:
-		if re.match(validusername, form["username"].value):
-			me.name = form["username"].value
-			db.dirty = True
-		else:
-			validationerror = "Bad username (must match" + validusername + ")"
-	if "content" in form:
-		messages = db.data["messages"]
-		content = form["content"].value
-		if len(content) > maxcontent:
-			validationerror = "Content too long (maxcontent=" + str(maxcontent) + "), trimmed excess"
-		messages.append(Message(me, datetime.utcnow(), content[:maxcontent]))
-		enforceLength(messages, maxmessages)
-		db.dirty = True
-	
 
-#HTTP headers
-print "Content-Type: text/html"
-print
+handleForm(form)
 
-#HTML content
-print "<html><head>"
-print '<link rel="stylesheet" type="text/css" media="all" href="main.css">'
-print "</head><body>"
-print '<section class="me">'
-print "<h4>" + (cgi.escape(me.name) if isinstance(me, User) and isinstance(me.name, str) else defaultusername) + "</h4>"
-print "<code>" + cgi.escape(ipaddr, quote=True) + "</code>"
-print '<form method="post"><input name="username"><input type="submit" value="Set username"></form>'
-print "</section>"
-
-if validationerror:
-	print "<div>" + validationerror + "</div>"
-	
-print '<section class="post">'
-print '<h3>Post message</h3>'
-print '<form method="post">'
-print '<textarea name="content"></textarea><input type="submit" value="Post">'
-print '</form>'
-print "</section>"
-print '<section class="messages">'
-
-if not db.valid():
-	print "Database invalid"
-elif len(db.data["messages"]) < 1 :
-	print "No messages"
-else:
-	for msg in reversed(db.data["messages"]):
-		print "<div>"
-		print cgi.escape(msg.user.name if isinstance(msg.user.name, str) else msg.user.ip, quote=True)
-		print " at "
-		print cgi.escape(msg.date.isoformat(), quote=True)
-		print "</div>"
-		print "<div>"
-		print cgi.escape(msg.content, quote=True)
-		print "</div>"
-		print "<br>"
-
-print "</section>"
-print "</body></html>"
+printHeaders()
+printContent()
 
 db.close()
