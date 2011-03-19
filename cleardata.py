@@ -1,3 +1,5 @@
+#!/usr/local/bin/python2.6
+
 import sys
 import cPickle
 try:

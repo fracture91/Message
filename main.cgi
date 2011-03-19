@@ -14,54 +14,13 @@ from datetime import datetime
 #import sqlite3
 import re
 
-#modules from the shared directory
-sys.path.append("/home/andrew.d.hurle/public_html/shared")
+#modules from the current working directory
+#importing them without this sys.path stuff doesn't work for some reason
+sys.path.append(os.getcwd())
 from DB import DB
+from FriendlyConfig import FriendlyConfig
 del sys.path[0]
 
-from ConfigParser import RawConfigParser
-
-#like a RawConfigParser, but reads file upon construction, adds a section named mainSection if not present,  
-#and will create the config file if it doesn't exist.
-#getmain* methods are like RawConfigParser.get* methods.  Arguments are option[, section] where section defaults to mainSection.
-class FriendlyConfig(RawConfigParser):
-	def __init__(self, filename, defaults={}, mainSection="main"):
-		#RawConfigParser is an old-style class
-		RawConfigParser.__init__(self, defaults)
-		self.filename = filename
-		self.mainSection = mainSection
-		
-		configExists = False
-		try:
-			configFile = open(self.filename, "r")
-			configExists = True
-			self.readfp(configFile)
-			configFile.close()
-		except:
-			pass
-		
-		if not self.has_section(self.mainSection):
-			self.add_section(self.mainSection)
-		
-		if not configExists:
-			self.write(open(self.filename, "w"))
-
-	def getmain(self, option, section=None):
-		if section is None:
-			section = self.mainSection
-		return RawConfigParser.get(self, section, option)
-	def getmainint(self, option, section=None):
-		if section is None:
-			section = self.mainSection
-		return RawConfigParser.getint(self, section, option)
-	def getmainfloat(self, option, section=None):
-		if section is None:
-			section = self.mainSection
-		return RawConfigParser.getfloat(self, section, option)
-	def getmainboolean(self, option, section=None):
-		if section is None:
-			section = self.mainSection
-		return RawConfigParser.getboolean(self, section, option)
 
 config = FriendlyConfig("config.ini", {
 	"datafile": "data.pkl",
