@@ -19,12 +19,60 @@ sys.path.append("/home/andrew.d.hurle/public_html/shared")
 from DB import DB
 del sys.path[0]
 
-datafile = "data.pkl"
-defaultusername = "Unknown User"
-validusername = "^[\w.\-\*\(\)\&\^\%\$\#\@\!]{1,30}$"
-maxusers = 1000
-maxmessages = 5000
-maxcontent = 5000
+from ConfigParser import RawConfigParser
+
+#like a RawConfigParser, but reads file upon construction, adds a section named mainSection if not present,  
+#and will create the config file if it doesn't exist.
+#getmain* methods are like RawConfigParser.get* methods.  Arguments are option[, section] where section defaults to mainSection.
+class FriendlyConfig(RawConfigParser):
+	def __init__(self, filename, defaults={}, mainSection="main"):
+		#RawConfigParser is an old-style class
+		RawConfigParser.__init__(self, defaults)
+		self.filename = filename
+		self.mainSection = mainSection
+		
+		configExists = False
+		try:
+			configFile = open(self.filename, "r")
+			configExists = True
+			self.readfp(configFile)
+			configFile.close()
+		except:
+			pass
+		
+		if not self.has_section(self.mainSection):
+			self.add_section(self.mainSection)
+		
+		if not configExists:
+			self.write(open(self.filename, "w"))
+
+	def getmain(self, option, section=None):
+		if section is None:
+			section = self.mainSection
+		return RawConfigParser.get(self, section, option)
+	def getmainint(self, option, section=None):
+		if section is None:
+			section = self.mainSection
+		return RawConfigParser.getint(self, section, option)
+	def getmainfloat(self, option, section=None):
+		if section is None:
+			section = self.mainSection
+		return RawConfigParser.getfloat(self, section, option)
+	def getmainboolean(self, option, section=None):
+		if section is None:
+			section = self.mainSection
+		return RawConfigParser.getboolean(self, section, option)
+
+config = FriendlyConfig("config.ini", {
+	"datafile": "data.pkl",
+	"defaultusername": "Unknown User",
+	"validusername": "^[\w.\-\*\(\)\&\^\%\$\#\@\!]{1,30}$",
+	"maxusers": "1000",
+	"maxmessages": "5000",
+	"maxcontent": "5000"
+	})
+
+
 validationerror = None
 
 class MessageDB(DB):
@@ -41,7 +89,7 @@ class MessageDB(DB):
 				users = self.data["users"]
 				user = User(ip, name)
 				users.append(user)
-				enforceLength(users, maxusers)
+				enforceLength(users, config.getmainint("maxusers"))
 				self.dirty = True
 			return user
 	
@@ -65,20 +113,23 @@ def enforceLength(list, length):
 	return False
 
 def handleForm(form):
+	global validationerror
 	if db.valid():
 		if "username" in form:
+			validusername = config.getmain("validusername")
 			if re.match(validusername, form["username"].value):
 				me.name = form["username"].value
 				db.dirty = True
 			else:
-				validationerror = "Bad username (must match" + validusername + ")"
+				validationerror = "Bad username (must match " + validusername + ")"
 		if "content" in form:
 			messages = db.data["messages"]
 			content = form["content"].value
+			maxcontent = config.getmainint("maxcontent")
 			if len(content) > maxcontent:
 				validationerror = "Content too long (maxcontent=" + str(maxcontent) + "), trimmed excess"
 			messages.append(Message(me, datetime.utcnow(), content[:maxcontent]))
-			enforceLength(messages, maxmessages)
+			enforceLength(messages, config.getmainint("maxmessages"))
 			db.dirty = True
 	
 def printHeaders():
@@ -90,7 +141,7 @@ def printContent():
 	print '<link rel="stylesheet" type="text/css" media="all" href="main.css">'
 	print "</head><body>"
 	print '<section class="me">'
-	print "<h4>" + (cgi.escape(me.name) if isinstance(me, User) and isinstance(me.name, str) else defaultusername) + "</h4>"
+	print "<h4>" + (cgi.escape(me.name) if isinstance(me, User) and isinstance(me.name, str) else config.getmain("defaultusername")) + "</h4>"
 	print "<code>" + cgi.escape(ipaddr, quote=True) + "</code>"
 	print '<form method="post"><input name="username"><input type="submit" value="Set username"></form>'
 	print "</section>"
@@ -127,8 +178,7 @@ def printContent():
 	
 
 
-
-db = MessageDB(datafile)
+db = MessageDB(config.getmain("datafile"))
 db.load()
 
 ipaddr = os.environ["REMOTE_ADDR"]
