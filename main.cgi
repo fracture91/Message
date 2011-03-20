@@ -16,7 +16,7 @@ import re
 
 #modules from the current working directory
 #importing them without this sys.path stuff doesn't work for some reason
-sys.path.append(os.getcwd())
+sys.path.insert(0, os.getcwd())
 from DB import DB
 from FriendlyConfig import FriendlyConfig
 del sys.path[0]
