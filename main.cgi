@@ -136,20 +136,18 @@ def printContent():
 	print "</body></html>"
 	
 
-
-db = MessageDB(config.getmain("datafile"))
-db.load()
-
 ipaddr = os.environ["REMOTE_ADDR"]
 form = cgi.FieldStorage()
-
-me = None
-if db.valid():
-	me = db.findUser(ip=ipaddr, make=True)
-
-handleForm(form)
-
 printHeaders()
-printContent()
 
-db.close()
+db = MessageDB(config.getmain("datafile"))
+with db.wait():
+
+	me = None
+	if db.valid():
+		me = db.findUser(ip=ipaddr, make=True)
+
+	handleForm(form)
+
+	printContent()
+
