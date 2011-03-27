@@ -16,8 +16,14 @@ else :
 	datafile = config.getmain("datafile")
 
 try:
-	file = open(datafile, "w")
-	cPickle.dump({"messages": [], "users": []}, file)
-	file.close()
+	print "This will reset all of your data in " + datafile + "!"
+	print "Enter 'y' to continue, anything else to quit."
+	if raw_input() == "y":
+		file = open(datafile, "w")
+		cPickle.dump({"messages": [], "users": []}, file)
+		file.close()
+		print datafile + " has been reset."
+	else:
+		print datafile + " won't be reset, your data is safe."
 except:
 	print "Error: " + str(sys.exc_info()[0]) + ", " + str(sys.exc_info()[1])

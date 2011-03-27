@@ -25,54 +25,57 @@ del sys.path[0]
 config = FriendlyConfig("config.ini", {
 	"datafile": "data.pkl",
 	"defaultusername": "Unknown User",
-	"validusername": "^[\w.\-\*\(\)\&\^\%\$\#\@\!]{1,30}$",
+	"validusername": "^[\w.\-\*\(\)\&\^\%\$\#\@\!]{3,30}$",
 	"maxusers": "1000",
 	"maxmessages": "5000",
 	"maxcontent": "5000"
 	})
 
-
-validationerror = None
-
 	
 
-def handleForm(form):
-	global validationerror
+def handleForm(db, me, form, errors):
 	if db.valid():
 		if "username" in form:
 			if not(db.setUsername(me, form["username"].value)):
-				validationerror = "Bad username (must match " + db.validusername + ")"
+				errors.append('Bad username (<a href="http://en.wikipedia.org/wiki/Regular_expression">must match ' + db.validusername + '</a>)')
 		if "content" in form:
 			content = form["content"].value
 			message = db.addMessage(me, datetime.utcnow(), content)
 			overflow = len(content) - db.maxcontent
 			if overflow > 0:
-				validationerror = "Content " + str(overflow) + " characters too long (maxcontent=" + str(db.maxcontent) + "), trimmed excess"
+				errors.append("Content " + str(overflow) + " characters too long (maxcontent=" + str(db.maxcontent) + "), trimmed excess")
 	
 def printHeaders():
 	print "Content-Type: text/html"
 	print
+
+def printErrors(errors):
+	if len(errors) > 0:
+		print '<ul class="errors">'
+		for err in errors:
+			print "<li>" + err + "</li>"
+		print "</ul>"
 	
-def printContent():
+def printContent(db, me, ipaddr, errors):
 	print "<html><head>"
 	print '<link rel="stylesheet" type="text/css" media="all" href="main.css">'
 	print "</head><body>"
-	print '<section class="me">'
+	print '<section id="me">'
 	print "<h4>" + (cgi.escape(me.name) if isinstance(me, User) and isinstance(me.name, str) else config.getmain("defaultusername")) + "</h4>"
 	print "<code>" + cgi.escape(ipaddr, quote=True) + "</code>"
 	print '<form method="post"><input name="username"><input type="submit" value="Set username"></form>'
 	print "</section>"
 
-	if validationerror:
-		print "<div>" + validationerror + "</div>"
+	printErrors(errors)
 		
-	print '<section class="post">'
+	print '<section id="post">'
 	print '<h3>Post message</h3>'
 	print '<form method="post">'
 	print '<textarea name="content"></textarea><input type="submit" value="Post">'
 	print '</form>'
 	print "</section>"
-	print '<section class="messages">'
+	print '<section id="messages">'
+	print "<h3>Messages</h3>"
 
 	if not db.valid():
 		print "Database invalid"
@@ -83,7 +86,7 @@ def printContent():
 			print "<div>"
 			print cgi.escape(msg.user.name if isinstance(msg.user.name, str) else msg.user.ip, quote=True)
 			print " at "
-			print cgi.escape(msg.date.isoformat(), quote=True)
+			print cgi.escape(msg.date.isoformat(), quote=True) + " UTC"
 			print "</div>"
 			print "<div>"
 			print cgi.escape(msg.content, quote=True)
@@ -94,20 +97,24 @@ def printContent():
 	print "</body></html>"
 	
 
-ipaddr = os.environ["REMOTE_ADDR"]
-form = cgi.FieldStorage()
-printHeaders()
+def main():
+	ipaddr = os.environ["REMOTE_ADDR"]
+	form = cgi.FieldStorage()
+	printHeaders()
 
-db = MessageDB(config.getmain("datafile"), config.getmain("validusername"), config.getmainint("maxusers"),
-	config.getmainint("maxmessages"), config.getmainint("maxcontent"))
-	
-with db.wait():
+	db = MessageDB(config.getmain("datafile"), config.getmain("validusername"), config.getmainint("maxusers"),
+		config.getmainint("maxmessages"), config.getmainint("maxcontent"))
+		
+	with db.wait():
 
-	me = None
-	if db.valid():
-		me = db.addUser(ip=ipaddr, check=True)
+		me = None
+		if db.valid():
+			me = db.addUser(ip=ipaddr, check=True)
 
-	handleForm(form)
+		errors = []
+		handleForm(db, me, form, errors)
 
-	printContent()
+		printContent(db, me, ipaddr, errors)
 
+main()
+		

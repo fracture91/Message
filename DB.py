@@ -22,7 +22,7 @@ class DB(object):
 	def load(self):
 		try:
 			#open the data file and read data into self.data 
-			file = open(self.filename, "r")
+			file = open(self.filename, "rb")
 			self.data = cPickle.load(file)
 			self.dirty = False
 			file.close()
@@ -33,7 +33,7 @@ class DB(object):
 	def save(self):
 		try:
 			if self.valid():
-				file = open(self.filename, "w")
+				file = open(self.filename, "wb")
 				cPickle.dump(self.data, file)
 				self.dirty = False
 				file.close()

@@ -6,22 +6,22 @@ section {
 overflow: auto;
 }
 
-.me > h4 {
+#me > h4 {
 float: left;
 margin: 5px;
 }
 
-.me > code {
+#me > code {
 float: left;
 margin: 8px 5px;
 }
 
-.me > form {
+#me > form {
 float: left;
 margin: 3px 5px 0;
 }
 
-.post > form > textarea {
+#post > form > textarea {
 display: block;
 height: 200px;
 max-width: 500px;
