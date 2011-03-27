@@ -17,7 +17,7 @@ import re
 #modules from the current working directory
 #importing them without this sys.path stuff doesn't work for some reason
 sys.path.insert(0, os.getcwd())
-from DB import DB
+from MessageDB import MessageDB, User, Message, enforceLength
 from FriendlyConfig import FriendlyConfig
 del sys.path[0]
 
@@ -34,62 +34,20 @@ config = FriendlyConfig("config.ini", {
 
 validationerror = None
 
-class MessageDB(DB):
-	def __init__(self, filename):
-		super(MessageDB, self).__init__(filename)
-	def findUser(self, name=None, ip=None, make=False):
-		if (not name) == (not ip): #if both arguments are given or neither are given
-			raise TypeError("Must provide exactly one of name or ip")
-		else:
-			#find the first user with a matching name or ip
-			user = next((user for user in self.data["users"] if name and user.name == name or ip and user.ip == ip), None)
-			#make a new user if preferred
-			if user is None and make:
-				users = self.data["users"]
-				user = User(ip, name)
-				users.append(user)
-				enforceLength(users, config.getmainint("maxusers"))
-				self.dirty = True
-			return user
 	
-	
-class User(object):
-	def __init__(self, ip, name):
-		self.ip = ip
-		self.name = name
-	
-class Message(object):
-	def __init__(self, user, date, content):
-		self.user = user
-		self.date = date
-		self.content = content
-	
-def enforceLength(list, length):
-	difference = len(list) - length
-	if difference > 0:
-		del list[:difference]
-		return True
-	return False
 
 def handleForm(form):
 	global validationerror
 	if db.valid():
 		if "username" in form:
-			validusername = config.getmain("validusername")
-			if re.match(validusername, form["username"].value):
-				me.name = form["username"].value
-				db.dirty = True
-			else:
-				validationerror = "Bad username (must match " + validusername + ")"
+			if not(db.setUsername(me, form["username"].value)):
+				validationerror = "Bad username (must match " + db.validusername + ")"
 		if "content" in form:
-			messages = db.data["messages"]
 			content = form["content"].value
-			maxcontent = config.getmainint("maxcontent")
-			if len(content) > maxcontent:
-				validationerror = "Content too long (maxcontent=" + str(maxcontent) + "), trimmed excess"
-			messages.append(Message(me, datetime.utcnow(), content[:maxcontent]))
-			enforceLength(messages, config.getmainint("maxmessages"))
-			db.dirty = True
+			message = db.addMessage(me, datetime.utcnow(), content)
+			overflow = len(content) - db.maxcontent
+			if overflow > 0:
+				validationerror = "Content " + str(overflow) + " characters too long (maxcontent=" + str(db.maxcontent) + "), trimmed excess"
 	
 def printHeaders():
 	print "Content-Type: text/html"
@@ -140,12 +98,14 @@ ipaddr = os.environ["REMOTE_ADDR"]
 form = cgi.FieldStorage()
 printHeaders()
 
-db = MessageDB(config.getmain("datafile"))
+db = MessageDB(config.getmain("datafile"), config.getmain("validusername"), config.getmainint("maxusers"),
+	config.getmainint("maxmessages"), config.getmainint("maxcontent"))
+	
 with db.wait():
 
 	me = None
 	if db.valid():
-		me = db.findUser(ip=ipaddr, make=True)
+		me = db.addUser(ip=ipaddr, check=True)
 
 	handleForm(form)
 
