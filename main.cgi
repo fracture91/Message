@@ -60,10 +60,10 @@ def handleCookie(db, ipaddr, cookie, errors):
 	if db.valid():
 		#find the user based on the username in the cookie, and create if missing if username is default
 		me = db.findUser(username, ipaddr, username==config.getmain("defaultusername"))
-
-	#if username in cookie doesn't exist, set cookie to default username
-	if me is None:
-		setCookieValue(newcookie, "username", config.getmain("defaultusername"))
+		#if username in cookie doesn't exist, set cookie to default username
+		if me is None:
+			setCookieValue(newcookie, "username", config.getmain("defaultusername"))
+			me = db.findUser(config.getmain("defaultusername"), ipaddr, True)
 		
 	return me, newcookie
 	
@@ -77,11 +77,14 @@ def handleForm(db, me, ipaddr, errors, cookie, form):
 				me = newUser
 				setCookieValue(cookie, "username", form["username"].value)
 		if "content" in form:
-			content = form["content"].value
-			message = db.addMessage(ipaddr, me, datetime.utcnow(), content)
-			overflow = len(content) - db.maxcontent
-			if overflow > 0:
-				errors.append("Content " + str(overflow) + " characters too long (maxcontent=" + str(db.maxcontent) + "), trimmed excess")
+			if me is not None:
+				content = form["content"].value
+				message = db.addMessage(ipaddr, me, datetime.utcnow(), content)
+				overflow = len(content) - db.maxcontent
+				if overflow > 0:
+					errors.append("Content " + str(overflow) + " characters too long (maxcontent=" + str(db.maxcontent) + "), trimmed excess")
+			else:
+				errors.append("Could not post message, user not found")
 	return me
 	
 def printHeaders(newcookie):
