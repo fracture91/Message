@@ -13,6 +13,8 @@ from datetime import datetime
 #have the important _sqlite3.so file
 #import sqlite3
 import re
+from Cookie import SimpleCookie
+import string
 
 #modules from the current working directory
 #importing them without this sys.path stuff doesn't work for some reason
@@ -24,29 +26,67 @@ del sys.path[0]
 
 config = FriendlyConfig("config.ini", {
 	"datafile": "data.pkl",
-	"defaultusername": "Unknown User",
+	"defaultusername": "Anonymous",
 	"validusername": "^[\w.\-\*\(\)\&\^\%\$\#\@\!]{3,30}$",
 	"maxusers": "1000",
 	"maxmessages": "5000",
-	"maxcontent": "5000"
+	"maxcontent": "5000",
+	"cookienamespace": "adhmsg"
 	})
 
 	
 
-def handleForm(db, me, form, errors):
+def getCookieKey(key):
+	return config.getmain("cookienamespace") + "_" + key
+	
+def getCookieValue(cookie, key):
+	fullkey = getCookieKey(key)
+	return str(cookie[fullkey].value) if isinstance(cookie, SimpleCookie) and fullkey in cookie else ""
+	
+def setCookieValue(cookie, key, value):
+	fullkey = getCookieKey(key)
+	if isinstance(cookie, SimpleCookie):
+		cookie[fullkey] = value
+
+def handleCookie(db, ipaddr, cookie, errors):
+	username = getCookieValue(cookie, "username")
+	username = username if db.validateUsername(username) else config.getmain("defaultusername")
+	
+	newcookie = SimpleCookie()
+	#this will clear out the username if not valid
+	setCookieValue(newcookie, "username", username)
+
+	me = None
+	if db.valid():
+		#find the user based on the username in the cookie, and create if missing if username is default
+		me = db.findUser(username, ipaddr, username==config.getmain("defaultusername"))
+
+	#if username in cookie doesn't exist, set cookie to default username
+	if me is None:
+		setCookieValue(newcookie, "username", config.getmain("defaultusername"))
+		
+	return me, newcookie
+	
+def handleForm(db, me, ipaddr, errors, cookie, form):
 	if db.valid():
 		if "username" in form:
-			if not(db.setUsername(me, form["username"].value)):
+			newUser = db.addUser(form["username"].value, ipaddr)
+			if not(newUser):
 				errors.append('Bad username (<a href="http://en.wikipedia.org/wiki/Regular_expression">must match ' + db.validusername + '</a>)')
+			else:
+				me = newUser
+				setCookieValue(cookie, "username", form["username"].value)
 		if "content" in form:
 			content = form["content"].value
-			message = db.addMessage(me, datetime.utcnow(), content)
+			message = db.addMessage(ipaddr, me, datetime.utcnow(), content)
 			overflow = len(content) - db.maxcontent
 			if overflow > 0:
 				errors.append("Content " + str(overflow) + " characters too long (maxcontent=" + str(db.maxcontent) + "), trimmed excess")
+	return me
 	
-def printHeaders():
+def printHeaders(newcookie):
 	print "Content-Type: text/html"
+	print newcookie
 	print
 
 def printErrors(errors):
@@ -56,7 +96,7 @@ def printErrors(errors):
 			print "<li>" + err + "</li>"
 		print "</ul>"
 	
-def printContent(db, me, ipaddr, errors):
+def printContent(db, me, ipaddr, errors, cookie):
 	print "<html><head>"
 	print '<link rel="stylesheet" type="text/css" media="all" href="main.css">'
 	print "</head><body>"
@@ -100,21 +140,23 @@ def printContent(db, me, ipaddr, errors):
 def main():
 	ipaddr = os.environ["REMOTE_ADDR"]
 	form = cgi.FieldStorage()
-	printHeaders()
-
+	
+	cookie = None
+	try:
+		cookie = SimpleCookie(os.environ["HTTP_COOKIE"] if "HTTP_COOKIE" in os.environ else None)
+	except:
+		pass
+	
 	db = MessageDB(config.getmain("datafile"), config.getmain("validusername"), config.getmainint("maxusers"),
 		config.getmainint("maxmessages"), config.getmainint("maxcontent"))
 		
 	with db.wait():
 
-		me = None
-		if db.valid():
-			me = db.addUser(ip=ipaddr, check=True)
-
 		errors = []
-		handleForm(db, me, form, errors)
-
-		printContent(db, me, ipaddr, errors)
+		me, newcookie = handleCookie(db, ipaddr, cookie, errors)
+		me = handleForm(db, me, ipaddr, errors, newcookie, form)
+		printHeaders(newcookie)
+		printContent(db, me, ipaddr, errors, newcookie)
 
 main()
 		

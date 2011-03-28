@@ -3,12 +3,13 @@ from DB import DB
 import re
 
 class User(object):
-	def __init__(self, ip, name):
-		self.ip = ip
+	def __init__(self, name, ip):
 		self.name = name
+		self.ips = [ip] if isinstance(ip, str) else []
 	
 class Message(object):
-	def __init__(self, user, date, content):
+	def __init__(self, ip, user, date, content):
+		self.ip = ip
 		self.user = user
 		self.date = date
 		self.content = content
@@ -30,43 +31,50 @@ class MessageDB(DB):
 		self.maxmessages = maxmessages
 		self.maxcontent = maxcontent
 	
-	def findUser(self, name=None, ip=None, add=False):
-		if (not name) == (not ip): #if both arguments are given or neither are given
-			raise TypeError("Must provide exactly one of name or ip")
-		else:
-			#find the first user with a matching name or ip
-			user = next((user for user in self.data["users"] if name and user.name == name or ip and user.ip == ip), None)
-			#add a new user if preferred
-			if user is None and add:
-				user = self.addUser(name, ip)
-			return user
+	def findUser(self, name, ip=None, add=False):
+		#find the first user with a matching name
+		user = next((user for user in self.data["users"] if user.name == name), None)
+		#add a new user if preferred
+		if user is None and add:
+			user = self.addUser(name, ip, False)
+		return user
 	
-	def addUser(self, name=None, ip=None, check=False):
-		if (not name) == (not ip): #if both arguments are given or neither are given
-			raise TypeError("Must provide exactly one of name or ip")
-		else:
-			if check:
-				user = self.findUser(name, ip)
-				if user:
-					return user
+	def addUser(self, name, ip=None, check=True):
+		if check:
+			user = self.findUser(name, ip)
+			if user:
+				self.addUserIp(user, ip)
+				return user
 
-			users = self.data["users"]
-			user = User(ip, name)
-			users.append(user)
-			enforceLength(users, self.maxusers)
-			self.dirty = True
-			return user
+		if not(self.validateUsername(name)):
+			return None
+		
+		users = self.data["users"]
+		user = User(name, ip)
+		users.append(user)
+		enforceLength(users, self.maxusers)
+		self.dirty = True
+		return user
 	
+	def validateUsername(self, name):
+		return re.match(self.validusername, name)
+	
+	#user's can't change usernames - this is just here for admin use
 	def setUsername(self, user, name, indb=True):
-		if re.match(self.validusername, name):
+		if self.validateUsername(name):
 			user.name = name
 			if indb:
 				self.dirty = True
 			return True
 		return False
 		
-	def addMessage(self, user, date, content):
-		message = Message(user, date, None)
+	def addUserIp(self, user, ip):
+		if ip not in user.ips:
+			user.ips.insert(0, ip)
+			self.dirty = True
+		
+	def addMessage(self, ip, user, date, content):
+		message = Message(ip, user, date, None)
 		self.setMessageContent(message, content)
 		messages = self.data["messages"]
 		messages.append(message)
